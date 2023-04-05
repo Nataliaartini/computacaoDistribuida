@@ -1,4 +1,4 @@
  import socket
 
-# HOST = 
-# PORT =
+HOST = 127.0.0.1
+# PORT = TEM QUE SER MAIOR QUE 1023 - SERÁ OUVIDA
