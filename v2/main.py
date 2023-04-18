@@ -43,7 +43,6 @@ def servidor():
                 stream_lock.release()
                 if not receiveMessageFromClient:
                     break
-                client.sendall(f'{clientExternoNome}-> {receiveMessageFromClient}'.encode('utf8'))
             else:
                 clientExternoNome = receiveMessageFromClient
         s.close()
