@@ -7,7 +7,7 @@ import random
 HOST = "127.0.0.1"
 PORT = 1313
 
-SPATH = 'tmp'#em principio lugar para guardar os processos??
+SPATH = 'tmp'#em principio lugar para guardar os processos?? acho que nao vai precisar??
 
 s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 
@@ -19,7 +19,7 @@ s.connect((HOST, PORT))
 def enviar():
     # try:
     while True:
-        texto = input()
+        texto = input('digite aqui: ')
         textoBytes = str.encode(texto, "utf8")
         s.sendall(textoBytes)# + ';' + HOST) #??
         # return 1
