@@ -13,6 +13,7 @@ print(f'Server rodando em {HOST}:{PORT}')
 
 clients = []
 usernames = []
+IDusers = []
 
 def globalMessage(message):
     for client in clients:
@@ -34,12 +35,16 @@ def handleMessages(client):
 
 while True:
     try:
-        client, address = s.accept()
+        client, address, IDuser = s.accept()
         print(f"New Connetion: {str(address)}")
         clients.append(client)
         client.send('getUser'.encode('utf8'))
         username = client.recv(1024).decode('utf8')
         usernames.append(username)
+
+        IDusers.append(IDuser)
+        IDuser = client.recv(1024)
+
         globalMessage(f'{username} just joined the chat!'.encode('utf8'))
         user_thread = threading.Thread(target=handleMessages,args=(client,))
         user_thread.start()
