@@ -1,10 +1,10 @@
-# echo-client.py
-
 import socket
 import threading
 
 HOST = "127.0.0.1"
 PORT = 1313
+
+SPATH = 'tmp'#em principio lugar para guardar os processos??
 
 s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 
@@ -12,17 +12,31 @@ usuario = input("Digite seu nome: ")
 #fazer uma função pra definir o ID do usuário
 s.connect((HOST, PORT))
 
-def regiaoCritica():
-    isRegiaoCritica = 0
-    #implementar a função de eleição que decide qual processo(ID) vai rodar
-
 def enviar():
-    while True:
+    try:
         texto = input()
         textoBytes = str.encode(texto, "utf8")
-        s.sendall(textoBytes)
+        s.sendall(textoBytes + ';' + HOST) #??
+        return 1
+    except:
+        return 0
 
-        #chamar a função de cima pra ver se pode acessar o server
+def regiaoCritica(coordenador):
+    while True:
+        ## Verifica se o coordenador esta ativo
+        status = enviar(coordenador,'1')
+        if status == 0:
+            print 'Coodenador parado '+str(coordenador)+'. Iniciando Eleicao'
+            list = os.listdir(SPATH)
+            for processo in list:
+                if int(processo) > int(HOST):
+                    status = enviar(processo,'E')
+                    if status == 0:
+                        print 'Erro enviando E ao processo ' + processo
+            break
+        else:
+            print 'Conectou no coordenador ' + coordenador
+    return 0
 
 def receber():
     while True:
