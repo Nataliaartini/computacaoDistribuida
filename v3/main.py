@@ -82,7 +82,8 @@ def main():
         ## Inicialmente o menor PID he o coordenador
         list = os.listdir(SPATH)
         ## Ordena os pids e pega o primeiro
-        list.sort(cmp)
+        # list.sort(cmp)
+        list.sort()
         if list:
             COORD=list[0]
         else:
