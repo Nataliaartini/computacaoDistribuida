@@ -6,19 +6,20 @@ import sys
 ## Variaveis globais
 mySock = 0
 ## Path onde estao os sockets
-SPATH='/tmp/bully'
+SPATH='/home/aluno/Downloads/computacaoDistribuida-main/v3/sockets'
 
 ## Funcao q manda mensagem
 def sendMsg(dest,msg):
     global mySock
     try:
-            ns = socket.socket(socket.AF_UNIX,socket.SOCK_STREAM)
-            ns.connect((dest))
-            ns.send(msg+';'+mySock)
-            ns.close()
-            return 1
+        ns = socket.socket(socket.AF_UNIX,socket.SOCK_STREAM)
+        ns.connect((dest))
+        ns.send(msg+';'+mySock)
+        ns.close()
+        return 1
     except:
-            return 0
+        return 0
+
 ## Funcao q fica se comunicando com o coordenador para ver se esta ativo
 def verificaCoord(coord):
     global SPATH
@@ -31,10 +32,10 @@ def verificaCoord(coord):
             print ('Coodenador parado '+str(coord)+'. Iniciando Eleicao')
             list = os.listdir(SPATH)
             for i in list:
-                    if int(i) > int(mySock):
-                            status = sendMsg(i,'E')
-                            if status == 0:
-                                    print ('Erro enviando E ao processo '+i)
+                if int(i) > int(mySock):
+                    status = sendMsg(i,'E')
+                    if status == 0:
+                        print ('Erro enviando E ao processo '+i)
             break
         else:
             print ('Conectou no coordenador '+coord)
@@ -155,4 +156,4 @@ def main():
 
 ## Invoca a funcao main na inicializacao do programa
 if __name__ == '__main__':
-    main()
+        main()
