@@ -49,7 +49,7 @@ def main():
     global mySock
     global SPATH
     try:
-        ## Se recebeu um argumento he um processo recussitado
+        ## Se recebeu um argumento é um processo requisitado
         mySock = sys.argv[1]
         ## Testa se existem processos com prioridade maior
         list = os.listdir(SPATH)
@@ -57,7 +57,7 @@ def main():
             if int(i) > int(mySock):
                 status = sendMsg(i,'1')
                 if status == 1:
-                    fCord = 0 ## Se houver processos maiores, nao he coordenador
+                    fCord = 0 ## Se houver processos maiores, nao é coordenador
                     continue
         ## Se for o maior anuncia a todos
         if fCord == 1:
