@@ -106,11 +106,12 @@ def main():
         while True:
             if data:
                 msg = data.split(';')
+                print(msg)#apagar
                 ## Se a mensagem recebida for de eleicao
-                if msg[0] == 'E':
-                    print ('Recebido mensagem '+msg[0]+' de PID='+str(msg[1]))
+                if msg[1] == 'E':
+                    print ('Recebido mensagem '+msg[1]+' de PID='+str(msg[0]))
                     ## Enviar msg para pid menor parar eleicao
-                    sendMsg(msg[1],'PE')
+                    sendMsg(msg[0],'PE')
                     #procura se tem alguem maior q ele
                     list = os.listdir(SPATH)
                     maior = 1
@@ -156,4 +157,4 @@ def main():
 
 ## Invoca a funcao main na inicializacao do programa
 if __name__ == '__main__':
-        main()
+    main()
