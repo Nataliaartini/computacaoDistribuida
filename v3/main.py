@@ -14,7 +14,7 @@ def sendMsg(dest,msg):
     try:
         ns = socket.socket(socket.AF_UNIX,socket.SOCK_STREAM)
         ns.connect((dest))
-        ns.send(msg+';'+mySock)
+        ns.send(mySock+';'+msg)
         ns.close()
         return 1
     except:
@@ -131,19 +131,19 @@ def main():
                                 send = sendMsg(i,'C')
 
                     ## Recebeu msg para parar eleicao
-                    if msg[0] == 'PE':
-                        print( 'Recebida mensagem '+msg[0]+' de PID='+str(msg[1]))
+                    if msg[1] == 'PE':
+                        print( 'Recebida mensagem '+msg[1]+' de PID='+str(msg[0]))
                     ## Recebeu msg de verificacao de conexao
                     #if msg[0] == '1':
                     #       print 'Recebida mensagem '+msg[0]+' de PID='+str(msg[1])
                     ## Recebeu msg de coordenador
-                    if msg[0] == 'C':
-                        print( 'Novo coordenador '+msg[1])
+                    if msg[1] == 'C':
+                        print( 'Novo coordenador '+msg[0])
                         os.kill(childPID,9)
                         childPID = os.fork()
                         if childPID == 0:
                             ## Novo filho gerado monitora o novo coordenador
-                            verificaCoord(msg[1])
+                            verificaCoord(msg[0])
                             #sys.exit(1)
                     data = conn.recv(BUF)
             else:
