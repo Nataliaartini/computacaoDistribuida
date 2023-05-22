@@ -1,160 +1,151 @@
-#!/usr/bin/python
 import socket
-import os
-import sys
+import socketserver
+import threading
+import random
+import pickle
+from enum import Enum
+import time
 
-## Variaveis globais
-mySock = 0
-## Path onde estao os sockets
-SPATH='/home/aluno/Downloads/computacaoDistribuida-main/v3/sockets'
+# tempo em segundos para aguardar a simulação de falha
+LEADER_CRASH_DELAY = 6
 
-## Funcao q manda mensagem
-def sendMsg(dest,msg):
-    global mySock
-    try:
-        ns = socket.socket(socket.AF_UNIX,socket.SOCK_STREAM)
-        ns.connect((dest))
-        ns.send(mySock+';'+msg)
-        ns.close()
-        return 1
-    except:
-        return 0
+class Mensagens(Enum):
+    ELECTION = "ELECTION"
+    LEADER = "LEADER"
+    VICTORY = "VICTORY"
+    OK = "OK"
 
-## Funcao q fica se comunicando com o coordenador para ver se esta ativo
-def verificaCoord(coord):
-    global SPATH
-    global mySock
+class SocketServer(socketserver.ThreadingTCPServer):
+    pass
 
-    while True:
-        ## Verifica se o coordenador esta ativo
-        status = sendMsg(coord,'1')
-        if status == 0:
-            print ('Coodenador parado '+str(coord)+'. Iniciando Eleicao')
-            list = os.listdir(SPATH)
-            for i in list:
-                if int(i) > int(mySock):
-                    status = sendMsg(i,'E')
-                    if status == 0:
-                        print ('Erro enviando E ao processo '+i)
-            break
-        else:
-            print ('Conectou no coordenador '+coord)
-    return 0
+class MessageHandler(socketserver.BaseRequestHandler):
+    def handle(self):
+        message = self.request.recv(1024).decode()
+        self.server.process_message(message)
 
-def main():
-    ## Variaveis
-    fCord = 1
-    BUF=1024
+class Process(threading.Thread):
+    def __init__(self, pid, host, procs):
+        super().__init__()
+        self.pid = pid
+        self.host = host
+        self.ativo = True
+        self.eh_coordenador = False
+        self.processo_coordenador = None
+        self.procs_conectados = procs
+        self.eleicao_iniciada = False
 
-    global mySock
-    global SPATH
-    try:
-        ## Se recebeu um argumento é um processo requisitado
-        mySock = sys.argv[1]
-        ## Testa se existem processos com prioridade maior
-        list = os.listdir(SPATH)
-        for i in list:
-            if int(i) > int(mySock):
-                status = sendMsg(i,'1')
-                if status == 1:
-                    fCord = 0 ## Se houver processos maiores, nao é coordenador
-                    continue
-        ## Se for o maior anuncia a todos
-        if fCord == 1:
-            for i in list:
-                if int(i) < int(mySock):
-                    status = sendMsg(i,'C')
-    except:
-        ## Nome do socket = pid do processo
-        mySock=str(os.getpid())
-        fCord = 0
-    print ('Iniciando. PID='+str(mySock))
-    ## Verifica se existe o diretorio para os sockets
-    try:
-        os.chdir(SPATH)
-    except:
-        ## Se nao existe cria o diretorio
-        os.mkdir(SPATH)
-    try:
-        ## Cria o socket
-        s = socket.socket(socket.AF_UNIX,socket.SOCK_STREAM)
-        s.bind((mySock)) ## Atribui um nome ao socket
-        s.listen(1) ## Estabelece fila para conexoes
-        ## Inicialmente o menor PID he o coordenador
-        list = os.listdir(SPATH)
-        ## Ordena os pids e pega o primeiro
-        # list.sort(cmp)
-        list.sort()
-        if list:
-            COORD=list[0]
-        else:
-            COORD=mySock
-        ## Nao he o coordenador
-        if COORD != mySock and fCord == 0:
-            ## Divide o processo
-            childPID = os.fork()
-            if childPID == 0:
-                ## O filho permanece testando o coordenador
-                verificaCoord(COORD)
-                #sys.exit(1)
-        else:
-            COORD = mySock
-            print ('Eu sou o coordenador '+str(mySock))
-        ## Todos os processos pais permanecem em wait, aguardando conexao
-        conn, addr = s.accept()
-        data = conn.recv(BUF)
-        while True:
-            if data:
-                msg = data.split(';')
-                print(msg)#apagar
-                ## Se a mensagem recebida for de eleicao
-                if msg[1] == 'E':
-                    print ('Recebido mensagem '+msg[1]+' de PID='+str(msg[0]))
-                    ## Enviar msg para pid menor parar eleicao
-                    sendMsg(msg[0],'PE')
-                    #procura se tem alguem maior q ele
-                    list = os.listdir(SPATH)
-                    maior = 1
-                    for i in list:
-                        if int(i) > int(mySock):
-                            #print 'Enviar para PID '+i
-                            status = sendMsg(i,'E')
-                            if status == 1:
-                                maior = 0
-                    #se for o maior envia msg para todos como novo coord.
-                    if maior == 1:
-                        print ('Eu sou o novo Coordenador '+str(mySock))
-                        os.kill(childPID,9)
-                        for i in list:
-                            if int(i) < int(mySock):
-                                print ('enviando C para '+str(i))
-                                send = sendMsg(i,'C')
+    def run(self):
+        # cria o socket para comunicação usando SocketServer
+        self.server = SocketServer(self.host, MessageHandler)
+        self.server.process_message = self.processa_mensagem
+        server_thread = threading.Thread(target=self.server.serve_forever, daemon=True)
+        server_thread.start()
 
-                    ## Recebeu msg para parar eleicao
-                    if msg[1] == 'PE':
-                        print( 'Recebida mensagem '+msg[1]+' de PID='+str(msg[0]))
-                    ## Recebeu msg de verificacao de conexao
-                    #if msg[0] == '1':
-                    #       print 'Recebida mensagem '+msg[0]+' de PID='+str(msg[1])
-                    ## Recebeu msg de coordenador
-                    if msg[1] == 'C':
-                        print( 'Novo coordenador '+msg[0])
-                        os.kill(childPID,9)
-                        childPID = os.fork()
-                        if childPID == 0:
-                            ## Novo filho gerado monitora o novo coordenador
-                            verificaCoord(msg[0])
-                            #sys.exit(1)
-                    data = conn.recv(BUF)
+        # mantém o processo ativo
+        while self.ativo:
+            pass
+
+        # ao encerrar o processo libera os recursos
+        self.server.shutdown()
+        server_thread.join()
+
+
+    def processa_mensagem(self, full_message):
+        sender, message = full_message.split("-")
+        sender = int(sender)
+
+        time.sleep(random.randint(1, 5))
+
+        # quando recebe mensagem de ELEICAO responde com OK se estiver ativo
+        # pois sabe que veio de um PID menor
+        if message == Mensagens.ELECTION.value:
+            if self.ativo:
+                procs = [p for p in self.procs_conectados if p.pid == sender]
+                self.envia_mensagem(Mensagens.OK, procs)
+
+        # quando recebe OK é porque outro processo está requisitando a liderança
+        # desiste da eleicao
+        elif message == Mensagens.OK.value:
+            print(f"Proc. {self.pid} recebeu OK (PID: {sender}).")
+            self.eh_coordenador = False
+            proc = [p for p in self.procs_conectados if p.pid == sender][0]
+
+            # processo que enviou OK deveria iniciar nova eleicao ?
+            if not self.eh_coordenador and self.processo_coordenador is None:
+                proc.inicia_eleicao()
+
+        # quando recebe uma mensagem de LEADER há um novo coordenador
+        elif message == Mensagens.LEADER.value:
+            print(f"Proc. {self.pid} recebeu uma mensagem do novo COORDENADOR (PID: {sender}).")
+            self.eh_coordenador = False
+            self.processo_coordenador = [p for p in self.procs_conectados if p.pid == sender][0]
+
+    def inicia_eleicao(self):
+        print(f"Proc. {self.pid} iniciou uma ELEIÇÃO.")
+        self.eleicao_iniciada = True
+        # se o processo atual está rodando
+        if self.ativo:
+            highest_id_process = max([p.pid for p in self.procs_conectados])
+
+            # verifica se o processo atual possui o maior ID
+            if self.pid == highest_id_process:
+                self.declara_vitoria()
             else:
-                conn, addr = s.accept()
-                data = conn.recv(BUF)
-    except:
-        print ("Unexpected error:", sys.exc_info()[0])
-        s.close()
-        os.remove(SPATH+'/'+str(mySock))
-        print ('Processo '+str(mySock)+' parando')
+                self.envia_mensagem(Mensagens.ELECTION, [p for p in self.procs_conectados if p.pid > self.pid])
 
-## Invoca a funcao main na inicializacao do programa
-if __name__ == '__main__':
-    main()
+    def declara_vitoria(self):
+        print(f"Processo {self.pid} se declara como COORDENADOR.")
+        self.eh_coordenador = True
+        self.processo_coordenador = [p for p in self.procs_conectados if p.pid == self.pid][0]
+        self.envia_mensagem(Mensagens.LEADER)
+
+    def envia_mensagem(self, message, procs=None):
+        # possibilita enviar mensagem para um ou vários dependendo do parametro
+        if procs is None:
+            procs = self.procs_conectados
+        for proc in procs:
+            if proc.host != self.host and proc.ativo:
+                try:
+                    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
+                        sock.connect(proc.host)
+                        sock.sendall(f"{self.pid}-{message.value}".encode())
+                except socket.error as e:
+                    print(f"Impossivel enviar mensagem PID: {proc.pid}-{proc.host}")
+                    print(e)
+                    continue
+
+    def wait(self):
+        print(f"Processo {self.pid} aguardando...")
+
+    def simula_parada(self):
+        if self.eh_coordenador:
+            # Randomize the crash delay within a certain range
+            crash_delay = random.randint(LEADER_CRASH_DELAY - 5, LEADER_CRASH_DELAY + 5)
+            print(f"Process {self.pid} will simulate leader crash in {crash_delay} seconds...")
+            self.stop()
+
+    def stop(self):
+        self.ativo = False
+        print(f"Processo {self.pid} se despede.")
+
+
+SOCKET_ADDRESS = 12345
+SOCKET_HOST = 'localhost'
+NUM_PROCS = 5
+
+# cria a lista de processos para demonstração
+processes = []
+for i in range(NUM_PROCS):
+    address = (SOCKET_HOST, SOCKET_ADDRESS + i)
+    proc = Process(i + 1, address, processes)
+    processes.append(proc)
+    proc.start()
+
+
+# escolhe um processo aleatório para iniciar a eleição
+proc = processes[random.randint(0, NUM_PROCS-1)]
+proc.inicia_eleicao()
+
+
+# para os processos depois de um tempo para não consumir recursos
+threading.Timer(20, lambda: [proc.stop() for proc in processes if proc.ativo]).start()
