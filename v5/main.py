@@ -36,7 +36,7 @@ class Nodo(threading.Thread):
         self.host = host
         self.server = None
         self.is_input = is_input
-        self.tabela_hash = []
+        self.tabela_hash = {}
         self.tabela_roteamento = tabela_roteamento
 
     def run(self):
@@ -48,14 +48,15 @@ class Nodo(threading.Thread):
         print(f"Processo PID: {self.pid} conectado...")
 
         if self.is_input:
+            opcao = "-1"
             while opcao != "0":
                 print("""--------------------------
-                Menu:
-                1 - Cadastrar
-                2 - Listar todos
-                3 - Listar especifico
-                0 - Sair
-                --------------------------""")
+Menu:
+1 - Cadastrar
+2 - Listar todos
+3 - Listar especifico
+0 - Sair
+--------------------------""")
                 opcao = input()
 
                 if opcao == "1":
@@ -69,7 +70,7 @@ class Nodo(threading.Thread):
                     #    self.printar_usuarios()
                     #else:
                     nodo_vizinho = self.buscar_nodo_por_hash(1)
-                    self.envia_mensagem(Mensagem(self.pid, "PRI", -1, None), nodo_vizinho)
+                    self.envia_mensagem(Mensagem(self.pid, "PRI", -1, None, None), nodo_vizinho)
 
                 elif opcao == "3":
                     rg = input("Digite o RG de quem deseja buscar: ")
@@ -79,7 +80,7 @@ class Nodo(threading.Thread):
                         usuario = self.retornar_usuario(hash)
                         print("RG: " + usuario.rg, " NOME: " + usuario.nome)
                     else:
-                        self.envia_mensagem(Mensagem(self.pid, "PRI", hash, None), nodo_vizinho)
+                        self.envia_mensagem(Mensagem(self.pid, "PRI", hash, None, None), nodo_vizinho)
 
 
 
@@ -97,7 +98,7 @@ class Nodo(threading.Thread):
     
     def buscar_nodo_por_id(self, pid):
         for item in self.tabela_roteamento:
-            if item.pid == pid:
+            if item.no.pid == pid:
                 return item.no
 
 
@@ -112,7 +113,7 @@ class Nodo(threading.Thread):
         if nodo.pid == self.pid:
             self.tabela_hash[hash] = (rg, nome)
         else:
-            self.envia_mensagem(Mensagem(self.pid, "INS", hash, (rg, nome)), nodo)
+            self.envia_mensagem(Mensagem(self.pid, "INS", hash, (rg, nome), None), nodo)
 
     def calcular_hash(self, rg):
         return int(rg) %  20 + 1
@@ -124,22 +125,34 @@ class Nodo(threading.Thread):
         elif mensagem.tipo == "PRI" and mensagem.hash > 0:
             usuarios = []
             usuarios.append(self.retornar_usuario(mensagem.hash))
-            self.envia_mensagem(Mensagem(self.pid, "RET", mensagem.hash, None, usuarios))
+            for item in self.tabela_roteamento:
+                if item.no.pid != self.pid:
+                    self.envia_mensagem(Mensagem(self.pid, "RET", mensagem.hash, None, usuarios), item.no)
+                    return
+            
         elif mensagem.tipo == "PRI":
-            usuarios = self.tabela_hash
-            self.envia_mensagem(Mensagem(self.pid, "RET", mensagem.hash, None, usuarios))
+            usuarios = []
+            for item in self.tabela_hash:
+                usuarios.append(item)
+
+            for item in self.tabela_roteamento:
+                if item.no.pid != self.pid:
+                    self.envia_mensagem(Mensagem(self.pid, "RET", mensagem.hash, None, usuarios), item.no)
+                    return
+
         elif mensagem.tipo == "RET" and mensagem.hash > 0:
             for item in mensagem.usuarios:
                 print("RG: " + item.rg, " NOME: " + item.nome)
         elif mensagem.tipo == "RET":
             nodo = self.buscar_nodo_por_id(self.pid)
-            if nodo.incial == 1:
+            if nodo.pid == 1:
                 self.printar_usuarios()
 
             for item in mensagem.usuarios:
-                print("RG: " + item.rg, " NOME: " + item.nome)
+                #print("RG: " + item.rg, " NOME: " + item.nome)
+                print(item)
 
-            if nodo.incial != 1:
+            if nodo.pid != 1:
                 self.printar_usuarios()
 
 
@@ -161,5 +174,4 @@ n1.start()
 n2.start()
 #time.sleep(random.randint(4, 7))
 
-threading.Timer(60, lambda: [no.stop() for no in [n1, n2]]).start()
-#carla linda te amon 
+#threading.Timer(60, lambda: [no.stop() for no in [n1, n2]]).start()
