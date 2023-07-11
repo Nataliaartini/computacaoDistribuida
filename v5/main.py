@@ -12,6 +12,11 @@ class MessageHandler(socketserver.BaseRequestHandler):
         message = self.request.recv(1024).decode("ISO-8859-1")
         self.server.process_message(bytes(message, "ISO-8859-1"))
 
+class Pessoa:
+    def __init__(self, rg, nome, hash_armazenado):
+        self.hash_armazenado = hash_armazenado
+        self.rg = rg
+        self.nome = nome
 
 class TabelaRoteamento:
     def __init__(self, no, inicial, final):
@@ -37,6 +42,7 @@ class Nodo(threading.Thread):
         self.server = None
         self.is_input = is_input
         self.tabela_hash = {}
+        self.total_tabela_hash = 0
         self.tabela_roteamento = tabela_roteamento
 
     def run(self):
@@ -90,8 +96,9 @@ Menu:
         #server_thread.join()
 
     def printar_usuarios(self):
-        for item in self.tabela_hash:
-            print("RG: " + item.rg, " NOME: " + item.nome)
+        for i in range(21):
+            if self.tabela_hash.get(i) is not None:
+                print("IN. " + "[" + str(i) + "] RG: " + self.tabela_hash[i].rg, " NOME: " + self.tabela_hash[i].nome)
 
     def retornar_usuario(self, hash):
         return self.tabela_hash[hash]
@@ -101,6 +108,10 @@ Menu:
             if item.no.pid == pid:
                 return item.no
 
+    def buscar_intervalos_por_nodo_id(self, pid):
+        for item in self.tabela_roteamento:
+            if item.no.pid == pid:
+                return item
 
     def buscar_nodo_por_hash(self, hash):
         for item in self.tabela_roteamento:
@@ -109,19 +120,43 @@ Menu:
     
     def inserir_pessoa(self, rg, nome):
         hash = self.calcular_hash(rg)
+        self.inserir_pessoa_by_hash(rg, nome, hash)
+
+    def inserir_pessoa_by_hash(self, rg, nome, hash):
+        if self.total_tabela_hash >= 10:
+            print("PROCESSO " + str(self.pid) + " - ESTA CHEIO")
+
         nodo = self.buscar_nodo_por_hash(hash)
         if nodo.pid == self.pid:
-            self.tabela_hash[hash] = (rg, nome)
+            if self.total_tabela_hash < 10:
+                if self.tabela_hash.get(hash) is None:
+                    self.tabela_hash[hash] = Pessoa(rg, nome, hash)
+                    self.total_tabela_hash += 1
+                else:
+                    novo_hash = ((hash+1) % 21)
+                    if novo_hash == 0:
+                        novo_hash = 1
+                    self.inserir_pessoa_by_hash(rg, nome, novo_hash)
+            else:
+                novo_hash = hash
+                intervalo = self.buscar_intervalos_por_nodo_id(self.pid)
+                if(intervalo.inicial == 1):
+                    novo_hash = 11
+                else:
+                    novo_hash = 1
+
+                self.envia_mensagem(Mensagem(self.pid, "INS", novo_hash, Pessoa(rg, nome, novo_hash), None), nodo)
         else:
-            self.envia_mensagem(Mensagem(self.pid, "INS", hash, (rg, nome), None), nodo)
+            self.envia_mensagem(Mensagem(self.pid, "INS", hash, Pessoa(rg, nome, hash), None), nodo)
+
 
     def calcular_hash(self, rg):
-        return int(rg) %  20 + 1
+        return int(rg) % 20 + 1
 
     def processa_mensagem(self, mensagem):
         mensagem = pickle.loads(mensagem)  # recebe a mensagem
-        if mensagem.tipo == "ÏNS":
-            self.tabela_hash[mensagem.hash] = mensagem.usuario
+        if mensagem.tipo == "INS":
+            self.inserir_pessoa_by_hash(mensagem.usuario.rg, mensagem.usuario.nome, mensagem.hash)
         elif mensagem.tipo == "PRI" and mensagem.hash > 0:
             usuarios = []
             usuarios.append(self.retornar_usuario(mensagem.hash))
@@ -132,8 +167,9 @@ Menu:
             
         elif mensagem.tipo == "PRI":
             usuarios = []
-            for item in self.tabela_hash:
-                usuarios.append(item)
+            for i in range(21):
+                if self.tabela_hash.get(i) is not None:
+                    usuarios.append(self.tabela_hash[i])
 
             for item in self.tabela_roteamento:
                 if item.no.pid != self.pid:
@@ -149,8 +185,7 @@ Menu:
                 self.printar_usuarios()
 
             for item in mensagem.usuarios:
-                #print("RG: " + item.rg, " NOME: " + item.nome)
-                print(item)
+                print("EX. " + "[" + str(item.hash_armazenado) + "] RG: " + item.rg, " NOME: " + item.nome)
 
             if nodo.pid != 1:
                 self.printar_usuarios()
@@ -167,8 +202,8 @@ Menu:
             print(e)
 
 tabela_roteamento = []
-n1 = Nodo(1, ("localhost", 12345), tabela_roteamento, True)
-n2 = Nodo(2, ("localhost", 12346), tabela_roteamento, False)
+n1 = Nodo(1, ("localhost", 12347), tabela_roteamento, True)
+n2 = Nodo(2, ("localhost", 12348), tabela_roteamento, False)
 tabela_roteamento += [TabelaRoteamento(n1, 1, 10), TabelaRoteamento(n2, 11, 20)]
 n1.start()
 n2.start()
