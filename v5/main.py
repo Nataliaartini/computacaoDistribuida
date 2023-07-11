@@ -71,11 +71,10 @@ Menu:
                     self.inserir_pessoa(rg, nome)
 
                 elif opcao == "2":
-                    #nodo = self.buscar_nodo_por_id(self.pid)
-                    #if nodo.inicial == 1:
-                    #    self.printar_usuarios()
-                    #else:
                     nodo_vizinho = self.buscar_nodo_por_hash(1)
+                    if self.pid == nodo_vizinho.pid:
+                        nodo_vizinho = self.buscar_nodo_por_hash(11)
+
                     self.envia_mensagem(Mensagem(self.pid, "PRI", -1, None, None), nodo_vizinho)
 
                 elif opcao == "3":
@@ -84,16 +83,12 @@ Menu:
                     nodo = self.buscar_nodo_por_hash(hash)
                     if nodo.pid == self.pid:
                         usuario = self.retornar_usuario(hash)
-                        print("RG: " + usuario.rg, " NOME: " + usuario.nome)
+                        if usuario is None:
+                            print("RG Informado não existe")
+                        else:
+                            print("IN. " + "[" + str(usuario.hash_armazenado) + "] RG: " + usuario.rg, " NOME: " + usuario.nome)
                     else:
-                        self.envia_mensagem(Mensagem(self.pid, "PRI", hash, None, None), nodo_vizinho)
-
-
-
-
-        # ao encerrar o processo libera os recursos
-        #self.server.shutdown()
-        #server_thread.join()
+                        self.envia_mensagem(Mensagem(self.pid, "PRI", hash, None, None), nodo)
 
     def printar_usuarios(self):
         for i in range(21):
@@ -101,7 +96,7 @@ Menu:
                 print("IN. " + "[" + str(i) + "] RG: " + self.tabela_hash[i].rg, " NOME: " + self.tabela_hash[i].nome)
 
     def retornar_usuario(self, hash):
-        return self.tabela_hash[hash]
+        return self.tabela_hash.get(hash)
     
     def buscar_nodo_por_id(self, pid):
         for item in self.tabela_roteamento:
@@ -159,11 +154,15 @@ Menu:
             self.inserir_pessoa_by_hash(mensagem.usuario.rg, mensagem.usuario.nome, mensagem.hash)
         elif mensagem.tipo == "PRI" and mensagem.hash > 0:
             usuarios = []
-            usuarios.append(self.retornar_usuario(mensagem.hash))
-            for item in self.tabela_roteamento:
-                if item.no.pid != self.pid:
-                    self.envia_mensagem(Mensagem(self.pid, "RET", mensagem.hash, None, usuarios), item.no)
-                    return
+            usuario = self.retornar_usuario(mensagem.hash)
+            if usuario is None:
+                print("RG Informado não existe")
+            else:
+                usuarios.append(usuario)
+                for item in self.tabela_roteamento:
+                    if item.no.pid != self.pid:
+                        self.envia_mensagem(Mensagem(self.pid, "RET", mensagem.hash, None, usuarios), item.no)
+                        return
             
         elif mensagem.tipo == "PRI":
             usuarios = []
@@ -178,7 +177,7 @@ Menu:
 
         elif mensagem.tipo == "RET" and mensagem.hash > 0:
             for item in mensagem.usuarios:
-                print("RG: " + item.rg, " NOME: " + item.nome)
+                print("EX. " + "[" + str(item.hash_armazenado) + "] RG: " + item.rg, " NOME: " + item.nome)
         elif mensagem.tipo == "RET":
             nodo = self.buscar_nodo_por_id(self.pid)
             if nodo.pid == 1:
